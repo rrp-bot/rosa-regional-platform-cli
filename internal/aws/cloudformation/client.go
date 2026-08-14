@@ -2,6 +2,7 @@ package cloudformation
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
@@ -129,7 +130,13 @@ func (c *Client) DescribeStack(ctx context.Context, stackName string) (*StackInf
 		StackName: aws.String(stackName),
 	})
 	if err != nil {
-		return nil, wrapError(err)
+		wrapped := wrapError(err)
+		// Re-attach the stack name if wrapError produced a StackNotFoundError without one
+		var notFound *StackNotFoundError
+		if errors.As(wrapped, &notFound) && notFound.StackName == "" {
+			notFound.StackName = stackName
+		}
+		return nil, wrapped
 	}
 
 	if len(result.Stacks) == 0 {
