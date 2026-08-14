@@ -28,6 +28,7 @@ type createOptions struct {
 	outputFile         string
 	payloadFile        string
 	output             string
+	mirrorRegistry     string
 }
 
 func newCreateCommand() *cobra.Command {
@@ -98,6 +99,7 @@ Examples:
 	cmd.Flags().StringVar(&opts.outputFile, "output-file", "", "Output file for cluster configuration (default in dry-run: <cluster-name>-cluster.json)")
 	cmd.Flags().StringVar(&opts.payloadFile, "payload", "", "JSON payload file to POST to platform API")
 	cmd.Flags().StringVar(&opts.output, "output", "", "Output format (json)")
+	cmd.Flags().StringVar(&opts.mirrorRegistry, "mirror-registry", "", "ECR mirror registry host (e.g. 123456789012.dkr.ecr.us-west-1.amazonaws.com/my-repo); sets imageContentSources for the two OCP source repos")
 
 	return cmd
 }
@@ -176,6 +178,7 @@ func runCreateDryRun(ctx context.Context, opts *createOptions) error {
 		LabelEnvironment:   opts.labelEnvironment,
 		LabelTeam:          opts.labelTeam,
 		AWSConfig:          cfg,
+		MirrorRegistry:     opts.mirrorRegistry,
 	}
 
 	// Generate cluster configuration
@@ -225,6 +228,7 @@ func runCreateAndSubmit(ctx context.Context, opts *createOptions) error {
 		LabelEnvironment:   opts.labelEnvironment,
 		LabelTeam:          opts.labelTeam,
 		AWSConfig:          cfg,
+		MirrorRegistry:     opts.mirrorRegistry,
 	}
 
 	// Generate cluster configuration

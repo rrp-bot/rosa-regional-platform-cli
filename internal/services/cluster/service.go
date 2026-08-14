@@ -34,6 +34,7 @@ type GenerateClusterConfigRequest struct {
 	LabelEnvironment   string
 	LabelTeam          string
 	AWSConfig          aws.Config
+	MirrorRegistry     string // Optional ECR mirror registry; if set, ICS entries are generated for the two OCP source repos
 }
 
 // GenerateClusterConfigResponse contains the generated cluster configuration
@@ -95,32 +96,47 @@ func GenerateClusterConfig(ctx context.Context, req *GenerateClusterConfigReques
 		return nil, fmt.Errorf("IAM outputs missing required value WorkerInstanceProfileName")
 	}
 
-	spec := map[string]interface{}{
-		"hostedCluster": map[string]interface{}{
-			"release": map[string]interface{}{
-				"image": req.Version,
-			},
-			"platform": map[string]interface{}{
-				"type": "AWS",
-				"aws": map[string]interface{}{
-					"region": req.Region,
-					"rolesRef": map[string]interface{}{
-						"ingressARN":              iamOutputs["IngressRoleArn"],
-						"imageRegistryARN":        iamOutputs["ImageRegistryRoleArn"],
-						"storageARN":              iamOutputs["EBSCSIRoleArn"],
-						"networkARN":              iamOutputs["NetworkConfigRoleArn"],
-						"kubeCloudControllerARN":  iamOutputs["CloudControllerManagerRoleArn"],
-						"nodePoolManagementARN":   iamOutputs["NodePoolManagementRoleArn"],
-						"controlPlaneOperatorARN": iamOutputs["ControlPlaneOperatorRoleArn"],
-					},
-					"cloudProviderConfig": map[string]interface{}{
-						"vpc":    vpcID,
-						"zone":   req.Region + "a",
-						"subnet": map[string]interface{}{"id": firstSubnet},
-					},
+	hostedCluster := map[string]interface{}{
+		"release": map[string]interface{}{
+			"image": req.Version,
+		},
+		"platform": map[string]interface{}{
+			"type": "AWS",
+			"aws": map[string]interface{}{
+				"region": req.Region,
+				"rolesRef": map[string]interface{}{
+					"ingressARN":              iamOutputs["IngressRoleArn"],
+					"imageRegistryARN":        iamOutputs["ImageRegistryRoleArn"],
+					"storageARN":              iamOutputs["EBSCSIRoleArn"],
+					"networkARN":              iamOutputs["NetworkConfigRoleArn"],
+					"kubeCloudControllerARN":  iamOutputs["CloudControllerManagerRoleArn"],
+					"nodePoolManagementARN":   iamOutputs["NodePoolManagementRoleArn"],
+					"controlPlaneOperatorARN": iamOutputs["ControlPlaneOperatorRoleArn"],
+				},
+				"cloudProviderConfig": map[string]interface{}{
+					"vpc":    vpcID,
+					"zone":   req.Region + "a",
+					"subnet": map[string]interface{}{"id": firstSubnet},
 				},
 			},
 		},
+	}
+
+	if req.MirrorRegistry != "" {
+		hostedCluster["imageContentSources"] = []map[string]interface{}{
+			{
+				"source":  "quay.io/openshift-release-dev/ocp-release",
+				"mirrors": []string{req.MirrorRegistry},
+			},
+			{
+				"source":  "quay.io/openshift-release-dev/ocp-v4.0-art-dev",
+				"mirrors": []string{req.MirrorRegistry},
+			},
+		}
+	}
+
+	spec := map[string]interface{}{
+		"hostedCluster": hostedCluster,
 	}
 
 	// Build labels
